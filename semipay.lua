@@ -10,7 +10,7 @@ var_0_0.default = "CP1251"
 local var_0_1 = var_0_0.UTF8
 
 local isRunning = false
-local SCRIPT_VERSION = "0"
+local SCRIPT_VERSION = "1.1"
 local GITHUB_BASE = "https://raw.githubusercontent.com/downull/semipay/main/"
 local latestVersion = nil
 local updateAvailable = false
