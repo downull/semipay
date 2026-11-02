@@ -304,12 +304,16 @@ function installUpdate()
         local f = io.open(tempPath, "r")
         local content = f and f:read("*a") or nil
         if f then f:close() end
-        local remoteVersion = content and content:match('SCRIPT_VERSION%s*=%s*"([%d%.]+)"')
+        -- Версию берём из стандартного заголовка MoonLoader script_version(...).
+        -- Не требуем наличия отдельной переменной SCRIPT_VERSION: достаточно,
+        -- чтобы заголовок файла совпадал с опубликованным version.txt.
+        local remoteVersion = content and content:match('script_version%s*%(%s*["\']([%d%.]+)["\']%s*%)')
         if not content or not content:find('script_name("semipay")', 1, true)
-            or not content:find('script_version(', 1, true) or not remoteVersion
-            or not versionIsNewer(remoteVersion, SCRIPT_VERSION) then
+            or not remoteVersion or not latestVersion
+            or not versionIsNewer(remoteVersion, SCRIPT_VERSION)
+            or not (remoteVersion == latestVersion) then
             os.remove(tempPath)
-            msg("{FF6060}Файл обновления не прошёл проверку версии. Текущий скрипт не изменён.")
+            msg("{FF6060}Файл обновления не прошёл проверку: версия в semipay.lua не совпадает с version.txt или не новее текущей. Текущий скрипт не изменён.")
             return
         end
         -- Без .bak: удаляем старый файл только после полной загрузки и проверки нового.
