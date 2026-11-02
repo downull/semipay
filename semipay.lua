@@ -1,6 +1,6 @@
 script_name("semipay")
 script_author("downil")
-script_version("1")
+script_version("1.1")
 
 local var_0_0 = require("encoding")
 local sampev = require("samp.events")
@@ -10,7 +10,7 @@ var_0_0.default = "CP1251"
 local var_0_1 = var_0_0.UTF8
 
 local isRunning = false
-local SCRIPT_VERSION = "1"
+local SCRIPT_VERSION = "0"
 local GITHUB_BASE = "https://raw.githubusercontent.com/downull/semipay/main/"
 local latestVersion = nil
 local updateAvailable = false
@@ -19,23 +19,23 @@ local updateDownloadBusy = false
 local MENU_DIALOG_ID = 19001
 
 local function nowMs()
-    -- MoonLoader's game timer advances in real elapsed milliseconds, unlike os.clock().
+    -- Таймер игры MoonLoader отсчитывает реальное прошедшее время в миллисекундах, в отличие от os.clock().
     if type(getGameTimer) == "function" then
         return getGameTimer()
     end
-    -- Fallback for environments where getGameTimer is unavailable.
+    -- Запасной вариант для окружений, где getGameTimer недоступна.
     return math.floor(os.clock() * 1000)
 end
 
--- Accept integer currency amounts only. Separators are treated as thousands
--- separators only when every group is valid; ambiguous decimals are rejected.
+-- Принимаем только целые денежные суммы. Разделители считаются разделителями тысяч
+-- только если каждая группа цифр корректна; неоднозначные дробные значения отклоняются.
 local function normalizeIntegerAmount(raw)
     if not raw then return nil end
     raw = tostring(raw):gsub("%s", "")
     if raw:match("^%d+$") then return raw end
-    -- Some server dialogs render zero as "0." rather than "0".
-    -- Accept this exact trailing-decimal form, but do not strip arbitrary
-    -- punctuation from nonzero values (which could change the amount).
+    -- Некоторые серверные окна отображают ноль как «0.», а не «0».
+    -- Принимаем именно такой вариант с точкой в конце, но не удаляем произвольную
+    -- пунктуацию из ненулевых значений, поскольку это может изменить сумму.
     if raw:match("^0%.$") then return "0" end
     if raw:find("[.,]") then
         local separator = raw:match("[.,]")
@@ -80,7 +80,7 @@ function main()
 		wait(100)
 	end
 
-    -- Show one reminder after SA-MP becomes available.
+    -- Показываем одно напоминание после запуска SA-MP.
     wait(5000)
     msg("{FFD966}Не забудь оплатить налоги командой /w.")
 
@@ -107,7 +107,7 @@ function main()
         showSemiPayMenu()
     end)
 
-    -- Check GitHub shortly after the game becomes available.
+    -- Проверяем GitHub вскоре после запуска игры.
     lua_thread.create(function()
         wait(2500)
         checkForUpdates(true)
@@ -118,8 +118,8 @@ end
 
 local function toSampEncoding(value)
     value = tostring(value or "")
-    -- sampShowDialog expects the game's legacy CP1251 text, while this Lua
-    -- source is UTF-8. Convert menu strings before passing them to SA-MP.
+    -- sampShowDialog ожидает текст в старой кодировке игры CP1251, а этот Lua-файл
+    -- сохранён в UTF-8. Преобразуем строки меню перед передачей в SA-MP.
     local ok, converted = pcall(function() return var_0_1:decode(value) end)
     if ok and converted then return converted end
     return value
@@ -128,8 +128,8 @@ end
 function showSemiPayMenu()
     if not isSampAvailable() then return end
     local updateLabel = updateAvailable and "Обновить (доступна новая версия)" or "Обновить (сначала проверить)"
-    -- Version is deliberately shown as the first visible row. It is informational
-    -- only; the response handler ignores listItem 0. Action indexes are 1, 2, 3.
+    -- Версия намеренно отображается первой строкой. Это только информация:
+    -- обработчик игнорирует listItem 0. Индексы действий — 1, 2 и 3.
     local text = "Версия: " .. SCRIPT_VERSION .. "\n"
         .. "Оплатить налоги (/w)\n"
         .. "Проверить обновления\n"
@@ -148,7 +148,7 @@ function sampev.onSendDialogResponse(dialogId, button, listItem, inputText)
     if dialogId ~= MENU_DIALOG_ID then return end
     if button ~= 1 then return false end
 
-    -- Row 0 is the displayed version and must never trigger an action.
+    -- Строка 0 показывает версию и никогда не должна запускать действие.
     if listItem == 0 then
         showSemiPayMenu()
     elseif listItem == 1 then
@@ -169,10 +169,10 @@ function sampev.onSendDialogResponse(dialogId, button, listItem, inputText)
             end
         end)
     elseif listItem == 2 then
-        -- Check only: this branch never calls installUpdate().
+        -- Только проверка: эта ветка никогда не вызывает installUpdate().
         lua_thread.create(function() checkForUpdates(false) end)
     elseif listItem == 3 then
-        -- Install only after an explicit click on the fourth visible row.
+        -- Установка запускается только после явного выбора четвёртой видимой строки.
         if updateAvailable then
             lua_thread.create(function() installUpdate() end)
         else
@@ -206,9 +206,9 @@ local function versionIsNewer(remote, localVersion)
 end
 
 
--- MoonLoader downloadUrlToFile callback reports progress/status events, not HTTP codes.
--- STATUS_ENDDOWNLOADDATA (6) means file data finished; STATUSEX_ENDDOWNLOAD (58)
--- closes the operation. Status 57 is only STARTBINDING and must not be treated as failure.
+-- Обратный вызов downloadUrlToFile в MoonLoader сообщает события процесса загрузки, а не HTTP-коды.
+-- STATUS_ENDDOWNLOADDATA (6) означает, что данные файла получены; STATUSEX_ENDDOWNLOAD (58)
+-- завершает операцию. Статус 57 — это STARTBINDING, его нельзя считать ошибкой.
 local moonloaderDownloadStatus = require("moonloader").download_status
 local function downloadWithFallback(fileName, destination, callback)
     local finished = false
@@ -225,8 +225,8 @@ local function downloadWithFallback(fileName, destination, callback)
             if status == moonloaderDownloadStatus.STATUS_ENDDOWNLOADDATA then
                 dataFinished = true
             elseif status == moonloaderDownloadStatus.STATUSEX_ENDDOWNLOAD then
-                -- This is the terminal event. Verify that the destination exists
-                -- and contains data; do not compare this callback value to HTTP 200.
+                -- Это завершающее событие. Проверяем, что целевой файл существует
+                -- и содержит данные; не сравниваем значение callback с HTTP 200.
                 local f = io.open(destination, "rb")
                 local hasData = false
                 if f then
@@ -359,7 +359,7 @@ function doPayTaxes()
 	-- Оставляем проверку исходника тоже: некоторые сборки могут вернуть UTF-8 сразу.
     local function containsNoTaxes(text)
         text = tostring(text):gsub("{%x%x%x%x%x%x}", "")
-        -- Avoid string.lower(): Lua's byte-oriented lower() does not lowercase Cyrillic reliably.
+        -- Не используем string.lower(): побайтовая функция lower() в Lua ненадёжно переводит кириллицу в нижний регистр.
         return text:find("ет налогов", 1, true) ~= nil
             or text:find("ЕТ НАЛОГОВ", 1, true) ~= nil
             or text:find("налогов, которые требуется оплатить", 1, true) ~= nil
@@ -373,8 +373,8 @@ function doPayTaxes()
     debugLog("Tax result dialog=" .. tostring(var_5_0) .. "; noTaxesDue=" .. tostring(noTaxesDue))
     if var_5_0 == 15252 then
         debugLog("Tax payment dialog detected; sending ONE response")
-        -- Send the payment action only once. If the CEF-style dialog ignores the
-        -- normal SA-MP response, use UI close/Enter fallbacks without resending payment.
+        -- Отправляем действие оплаты только один раз. Если окно типа CEF игнорирует
+        -- стандартный ответ SA-MP, используем закрытие окна или Enter, не отправляя платёж повторно.
         sampSendDialogResponse(15252, 1, 0, "")
         local taxResultChanged = waitForDialogClosedOrDifferent(15252, 500)
         if taxResultChanged == nil or taxResultChanged == 15252 then
@@ -425,10 +425,10 @@ function doPayTaxes()
 		end
 	end
 
-    -- The SA-MP dialog text is returned in the game's legacy encoding, so
-    -- comparing it to UTF-8 Russian literals is unreliable. In this menu the
-    -- hotel extension action is the final non-empty row; its listitem is
-    -- zero-based, therefore the last row index is count - 1.
+    -- Текст диалога SA-MP возвращается в старой кодировке игры, поэтому
+    -- сравнивать его напрямую со строками на русском в UTF-8 ненадёжно. В этом меню
+    -- действие продления отеля находится в последней непустой строке; её listitem
+    -- начинается с нуля, поэтому индекс последней строки равен количеству строк минус один.
     wait(60)
     local phoneMenuText = sampGetDialogText() or ""
     local function stripColorTags(value)
@@ -446,8 +446,8 @@ function doPayTaxes()
     for i, line in ipairs(nonEmptyLines) do
     end
 
-    -- Expected menu has at least the 4 account actions plus other options.
-    -- Select the final row only when the menu shape looks valid.
+    -- Ожидаемое меню содержит как минимум четыре действия аккаунта и другие пункты.
+    -- Выбираем последнюю строку, только если структура меню выглядит корректной.
     if #nonEmptyLines < 10 then
         msg("{FFAA60}Не удалось определить пункт отеля: меню неожиданной длины.")
         return
@@ -457,9 +457,25 @@ function doPayTaxes()
     debugLog("Hotel menu selected index=" .. tostring(hotelIndex) .. "; rows=" .. tostring(#nonEmptyLines))
     sampSendDialogResponse(6565, 1, hotelIndex, "")
 
-    if not waitForDialog(26148, 5000) then
+    -- В разных сборках сервера у списка вариантов отеля может быть один из этих ID.
+    -- По отладочному журналу на этом сервере список вариантов приходит с ID 26149.
+    local hotelOptionsDialogId = nil
+    local hotelDialogDeadline = nowMs() + 5000
+    while nowMs() < hotelDialogDeadline do
+        wait(35)
+        if sampIsDialogActive() then
+            local currentId = sampGetCurrentDialogId()
+            if currentId == 26148 or currentId == 26149 then
+                hotelOptionsDialogId = currentId
+                break
+            end
+        end
+    end
+    debugLog("Hotel options dialog detected id=" .. tostring(hotelOptionsDialogId))
+    if not hotelOptionsDialogId then
         local currentId = sampIsDialogActive() and sampGetCurrentDialogId() or -1
-        msg("{FF6060}Ошибка: диалог отеля не появился. Меню оставлено для ручного управления.")
+        debugLog("Hotel options dialog not detected; current id=" .. tostring(currentId))
+        msg("{FF6060}Ошибка: диалог отеля не распознан. Меню оставлено для ручного управления.")
         return
     end
 
@@ -475,8 +491,8 @@ function doPayTaxes()
     if hotelDecodeOk and hotelDecoded then hotelTextUtf8 = hotelDecoded end
     local hotelPlainText = hotelTextUtf8:gsub("{%x%x%x%x%x%x}", "")
 
-    -- Parse only the explicit remaining-hours label. Never infer hours from an
-    -- arbitrary number in the list: if the label cannot be read, skip payment.
+    -- Разбираем только явную подпись с количеством оставшихся часов. Не определяем часы
+    -- по произвольным числам в списке: если подпись не удалось прочитать, пропускаем оплату.
     local availableHours = hotelPlainText:match("ПРОДЛИТЬ НА:%s*(%d+)%s*ЧАС")
         or hotelPlainText:match("продлить на:%s*(%d+)%s*час")
         or hotelPlainText:match("МОЖНО ПРОДЛИТЬ НА:%s*(%d+)%s*ЧАС")
@@ -499,38 +515,38 @@ function doPayTaxes()
 		else
 			msg("{FFAA60}Не удалось проверить остаток часов отеля. Продление пропущено для безопасности.")
 		end
-        -- Zero hours is a valid server state after taxes are paid. Close the
-        -- hotel options dialog without selecting an extension, trying several
-        -- non-payment close methods and verifying the dialog is gone.
-        sampSendDialogResponse(26148, 0, -1, "")
+        -- Ноль часов — допустимое состояние сервера после оплаты налогов. Закрываем
+        -- окно вариантов отеля, не выбирая продление; пробуем несколько способов
+        -- закрытия без оплаты и проверяем, что окно действительно исчезло.
+        sampSendDialogResponse(hotelOptionsDialogId, 0, -1, "")
         local closed = false
         local closeDeadline = nowMs() + 300
         while nowMs() < closeDeadline do
             wait(50)
-            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26148 then
+            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= hotelOptionsDialogId then
                 closed = true
                 break
             end
         end
-        if not closed and sampIsDialogActive() and sampGetCurrentDialogId() == 26148 and type(sampCloseCurrentDialogWithButton) == "function" then
+        if not closed and sampIsDialogActive() and sampGetCurrentDialogId() == hotelOptionsDialogId and type(sampCloseCurrentDialogWithButton) == "function" then
             sampCloseCurrentDialogWithButton(0)
             local deadline = nowMs() + 300
             while nowMs() < deadline do
                 wait(50)
-                if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26148 then
+                if not sampIsDialogActive() or sampGetCurrentDialogId() ~= hotelOptionsDialogId then
                     closed = true
                     break
                 end
             end
         end
-        if not closed and sampIsDialogActive() and sampGetCurrentDialogId() == 26148 and type(setVirtualKeyDown) == "function" then
+        if not closed and sampIsDialogActive() and sampGetCurrentDialogId() == hotelOptionsDialogId and type(setVirtualKeyDown) == "function" then
             setVirtualKeyDown(0x1B, true)
             wait(80)
             setVirtualKeyDown(0x1B, false)
             local deadline = nowMs() + 350
             while nowMs() < deadline do
                 wait(50)
-                if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26148 then
+                if not sampIsDialogActive() or sampGetCurrentDialogId() ~= hotelOptionsDialogId then
                     closed = true
                     break
                 end
@@ -541,9 +557,10 @@ function doPayTaxes()
             return
         end
 	else
-		sampSendDialogResponse(26148, 1, selectedIndex, "")
-		local nextDialog = waitForDialogDifferent(26148, 3000)
-		if nextDialog == 26149 then
+		sampSendDialogResponse(hotelOptionsDialogId, 1, selectedIndex, "")
+		local nextDialog = waitForDialogDifferent(hotelOptionsDialogId, 3000)
+        debugLog("Hotel confirmation dialog id=" .. tostring(nextDialog))
+		if nextDialog and nextDialog ~= hotelOptionsDialogId then
             local confirmText = sampGetDialogText() or ""
             local confirmTextUtf8 = confirmText
             local confirmDecodeOk, confirmDecoded = pcall(function() return var_0_1:encode(confirmText) end)
@@ -558,27 +575,27 @@ function doPayTaxes()
             if not priceText then priceText = confirmPlainText:match("%$%s*([%d%.,]+)") end
             local normalizedPrice = normalizeIntegerAmount(priceText)
 			if tonumber(confirmedHours) == selectedHours and normalizedPrice and tonumber(normalizedPrice) and tonumber(normalizedPrice) > 0 then
-                sampSendDialogResponse(26149, 1, -1, "")
-                -- Wait longer for the server response; never resend a payment confirmation automatically.
+                sampSendDialogResponse(nextDialog, 1, -1, "")
+                -- Даём серверу больше времени на ответ; никогда автоматически не отправляем подтверждение оплаты повторно.
                 local deadline = nowMs() + 250
                 local changed = false
                 while nowMs() < deadline do
                     wait(100)
-                    if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26149 then
+                    if not sampIsDialogActive() or sampGetCurrentDialogId() ~= nextDialog then
                         changed = true
                         break
                     end
                 end
-                if not changed and sampIsDialogActive() and sampGetCurrentDialogId() == 26149 then
-                    -- First response did not close the same confirmation dialog.
-                    -- Try the MoonLoader dialog-button helper once; do not repeat
-                    -- sampSendDialogResponse and do not issue a second payment packet.
+                if not changed and sampIsDialogActive() and sampGetCurrentDialogId() == nextDialog then
+                    -- Первый ответ не закрыл текущее окно подтверждения.
+                    -- Один раз пробуем вспомогательную функцию кнопки диалога MoonLoader; не повторяем
+                    -- sampSendDialogResponse и не отправляем второй платёжный пакет.
                     if type(sampCloseCurrentDialogWithButton) == "function" then
                         sampCloseCurrentDialogWithButton(1)
                         local fallbackDeadline = nowMs() + 250
                         while nowMs() < fallbackDeadline do
                             wait(100)
-                            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26149 then
+                            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= nextDialog then
                                 changed = true
                                 break
                             end
@@ -586,10 +603,10 @@ function doPayTaxes()
                     else
                     end
                 end
-                if not changed and sampIsDialogActive() and sampGetCurrentDialogId() == 26149 then
-                    -- The hotel confirmation is rendered as a CEF-style overlay with a visible
-                    -- Enter/Return hint on the yellow "ДАЛЕЕ" button. Try the keyboard shortcut
-                    -- once instead of sending another payment response packet.
+                if not changed and sampIsDialogActive() and sampGetCurrentDialogId() == nextDialog then
+                    -- Подтверждение отеля отображается как окно CEF с видимой
+                    -- подсказкой Enter/Return на жёлтой кнопке «ДАЛЕЕ». Один раз пробуем клавишу
+                    -- вместо отправки ещё одного пакета подтверждения оплаты.
                     if type(setVirtualKeyDown) == "function" then
                         setVirtualKeyDown(0x0D, true)
                         wait(120)
@@ -597,7 +614,7 @@ function doPayTaxes()
                         local keyDeadline = nowMs() + 400
                         while nowMs() < keyDeadline do
                             wait(100)
-                            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= 26149 then
+                            if not sampIsDialogActive() or sampGetCurrentDialogId() ~= nextDialog then
                                 changed = true
                                 break
                             end
@@ -613,18 +630,18 @@ function doPayTaxes()
                 end
 			else
 				msg("{FFAA60}Не удалось проверить срок или стоимость отеля. Продление пропущено.")
-				sampSendDialogResponse(26149, 0, 0, "")
+				sampSendDialogResponse(nextDialog, 0, 0, "")
 				wait(250)
 			end
 		else
 			msg("{FFAA60}Сервер не открыл подтверждение отеля. Продление пропущено.")
-			if sampIsDialogActive() and sampGetCurrentDialogId() == 26148 then
-				sampSendDialogResponse(26148, 0, 0, "")
+			if sampIsDialogActive() and sampGetCurrentDialogId() == hotelOptionsDialogId then
+				sampSendDialogResponse(hotelOptionsDialogId, 0, 0, "")
 			end
 		end
 	end
 
-    -- Do not start the family-apartment step while a hotel dialog is still open.
+    -- Не начинаем этап семейной квартиры, пока окно отеля остаётся открытым.
     if sampIsDialogActive() then
         local remainingDialogId = sampGetCurrentDialogId()
         if remainingDialogId == 26148 or remainingDialogId == 26149 then
@@ -645,21 +662,21 @@ function doPayTaxes()
 	wait(250)
 	cefSend("familyMenu.apart.payTax")
 
-	-- В зависимости от версии CEF/сервера окно налога квартиры может иметь
+	-- В зависимости от версии CEF/сервера окно налога квартиры может иметь один из известных ID.
 	local apartmentDialogId = nil
 	local apartmentDeadline = nowMs() + 4000
 	while nowMs() < apartmentDeadline do
 		wait(50)
 		if sampIsDialogActive() then
 			local currentId = sampGetCurrentDialogId()
-			if currentId == 27833 or currentId == 27806 or currentId == 27834 then
+			if currentId == 27833 or currentId == 27806 or currentId == 27834 or currentId == 27835 then
 				apartmentDialogId = currentId
 				break
 			end
 		end
 	end
 
-    debugLog("Apartment tax dialog=" .. tostring(apartmentDialogId))
+    debugLog("Apartment tax dialog=" .. tostring(apartmentDialogId) .. "; current=" .. tostring(sampIsDialogActive() and sampGetCurrentDialogId() or -1))
 	if not apartmentDialogId then
 		msg("{FF6060}Ошибка: диалог налога квартиры не распознан")
 		return
@@ -711,9 +728,9 @@ function doPayTaxes()
                 return
             end
 
-            -- The server commonly replaces the apartment dialog with a CEF overlay
-            -- (SA-MP dialog ID 0). Treat this as a result screen, not as a completed
-            -- chain: close it and verify that it is actually gone before continuing.
+            -- Сервер часто заменяет окно квартиры на окно CEF
+            -- (ID диалога SA-MP — 0). Считаем его экраном результата, а не завершённым
+            -- этапом: закрываем его и проверяем, что оно исчезло, прежде чем продолжить.
             if apartmentResultChanged == 0 and sampIsDialogActive() and sampGetCurrentDialogId() == 0 then
                 local apartmentResultText = sampGetDialogText() or ""
                 cefSendRaw({220, 0, 27, 0})
@@ -754,11 +771,11 @@ function doPayTaxes()
 	wait(150)
 	cefSend("familyMenu.exit")
 	wait(180)
-	if sampIsDialogActive() and (sampGetCurrentDialogId() == 27833 or sampGetCurrentDialogId() == 27806 or sampGetCurrentDialogId() == 27834) then
+	if sampIsDialogActive() and (sampGetCurrentDialogId() == 27833 or sampGetCurrentDialogId() == 27806 or sampGetCurrentDialogId() == 27834 or sampGetCurrentDialogId() == 27835) then
 		cefSendRaw({220, 0, 27, 0})
 		wait(250)
 	end
-	if sampIsDialogActive() and (sampGetCurrentDialogId() == 27833 or sampGetCurrentDialogId() == 27806 or sampGetCurrentDialogId() == 27834) then
+	if sampIsDialogActive() and (sampGetCurrentDialogId() == 27833 or sampGetCurrentDialogId() == 27806 or sampGetCurrentDialogId() == 27834 or sampGetCurrentDialogId() == 27835) then
 		msg("{FF6060}Окно семейной квартиры осталось открытым. Автоматическое продолжение остановлено.")
 		return
 	end
